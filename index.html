@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla de Pedidos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span style="font-size: 32px;">🚢</span>
+                <span>Salidas</span>
+                <span class="sort-indicator" id="sortIndicator" style="display: none;"></span>
+            </div>
+            <div class="date" id="date">00/00/0000</div>
+        </div>
+        
+        <div class="column-headers">
+            <div class="header-date">Fecha Entrega</div>
+            <div class="header-ship">Barco</div>
+            <div class="header-number">Número Pedido</div>
+        </div>
+        
+        <div class="departure-board" id="departureBoard">
+            <div class="loading">Cargando datos...</div>
+        </div>
+    </div>
+
+    <button class="config-btn" onclick="openConfig()">📅 Ordenar</button>
+
+    <div class="config-modal" id="configModal">
+        <div class="config-content">
+            <h2>Ordenar Pedidos</h2>
+            <div class="config-option">
+                <label for="sortOrder">Ordenar por fecha:</label>
+                <select id="sortOrder">
+                    <option value="asc">Más antigua primero</option>
+                    <option value="desc">Más reciente primero</option>
+                    <option value="none">Sin ordenar (orden original)</option>
+                </select>
+            </div>
+            <div class="config-buttons">
+                <button class="btn-apply" onclick="applySorting()">Aplicar</button>
+                <button class="btn-cancel" onclick="closeConfig()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN
+        const SPREADSHEET_ID = '1bXq_yWHUHBL5YWZcDQOy9u09Y2wH2v_eEBIOCwPNhJQ';
+        const SHEET_NAME = 'Pedidos'; // Cambia esto si tu hoja tiene otro nombre
+        const API_KEY = 'AIzaSyDOjxTMxlPAGOEayC0JwD28mx21zd6xkk8';
+
+        // Variables globales
+        let allPedidos = [];
+        let currentSortOrder = 'none';
+        let autoSortTimer = null;
+        let sortModeActivationTime = null;
+
+        // Función para abrir modal de configuración
+        function openConfig() {
+            document.getElementById('configModal').classList.add('active');
+            document.getElementById('sortOrder').value = currentSortOrder;
+        }
+
+        // Función para cerrar modal
+        function closeConfig() {
+            document.getElementById('configModal').classList.remove('active');
+        }
+
+        // Función para aplicar ordenación
+        function applySorting() {
+            const sortOrder = document.getElementById('sortOrder').value;
+            currentSortOrder = sortOrder;
+            
+            // Reiniciar temporizador de auto-ordenación
+            if (autoSortTimer) {
+                clearTimeout(autoSortTimer);
+            }
+            
+            // Si el usuario elige ordenar, activar auto-ordenación después de 5 minutos
+            if (sortOrder !== 'none') {
+                sortModeActivationTime = Date.now();
+                autoSortTimer = setTimeout(() => {
+                    currentSortOrder = 'asc';
+                    renderDepartures(allPedidos);
+                    updateSortIndicator();
+                }, 5 * 60 * 1000); // 5 minutos
+            } else {
+                sortModeActivationTime = null;
+            }
+            
+            renderDepartures(allPedidos);
+            updateSortIndicator();
+            closeConfig();
+        }
+
+        // Función para actualizar el indicador de ordenación
+        function updateSortIndicator() {
+            const indicator = document.getElementById('sortIndicator');
+            if (currentSortOrder === 'asc') {
+                indicator.textContent = '↑ Fecha Ascendente';
+                indicator.style.display = 'inline-block';
+            } else if (currentSortOrder === 'desc') {
+                indicator.textContent = '↓ Fecha Descendente';
+                indicator.style.display = 'inline-block';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        // Función para filtrar por barco
+        function filterByBarco(barco) {
+            const filteredPedidos = allPedidos.filter(p => p.barco === barco);
+            renderDepartures(filteredPedidos);
+
+            let showAllButton = document.getElementById('showAllButton');
+            if (!showAllButton) {
+                showAllButton = document.createElement('button');
+                showAllButton.id = 'showAllButton';
+                showAllButton.className = 'show-all-btn';
+                document.querySelector('.header .logo').appendChild(showAllButton);
+                
+                showAllButton.onclick = () => {
+                    renderDepartures(allPedidos);
+                    showAllButton.remove();
+                };
+            }
+            
+            showAllButton.textContent = `Mostrando solo "${barco}". Click para ver todos.`;
+        }
+
+        // Función para convertir color RGB de Google Sheets a CSS
+        function rgbToHex(color) {
+            if (!color) return null;
+            const r = Math.round((color.red || 0) * 255);
+            const g = Math.round((color.green || 0) * 255);
+            const b = Math.round((color.blue || 0) * 255);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+
+        // Función para actualizar la fecha
+        function updateDate() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            document.getElementById('date').textContent = day + '/' + month + '/' + year
+        }
+
+        // Función para cargar datos desde Google Sheets API
+        async function loadData() {
+            try {
+                document.getElementById('departureBoard').innerHTML = '<div class="loading">Cargando datos...</div>';
+                
+                const url = 'https://docs.google.com/spreadsheets/d/1s4UujUFauUSvfK25IwE3dwuCs9mVNzt45ScIrooVlbA/edit?gid=617571605#gid=617571605';
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error('Error al conectar con Google Sheets. Verifica tu API Key y permisos.');
+                }
+                
+                const data = await response.json();
+                const pedidos = parseGoogleSheets(data);
+                
+                if (pedidos.length === 0) {
+                    throw new Error('No se encontraron datos en la hoja');
+                }
+                
+                allPedidos = pedidos;
+                renderDepartures(allPedidos);
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+                document.getElementById('departureBoard').innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error al cargar los datos</h3>
+                        <p>${error.message}</p>
+                        <p>Verifica la configuración en el código JavaScript.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Función para parsear datos de Google Sheets API
+        function parseGoogleSheets(data) {
+            const rows = data.sheets[0].data[0].rowData;
+            if (!rows || rows.length < 2) return [];
+
+            // Obtener encabezados de la primera fila
+            const headers = rows[0].values.map(cell => 
+                (cell.formattedValue || '').trim().toLowerCase()
+            );
+
+            // Buscar índices de columnas
+            const getColumnIndex = (possibleNames) => {
+                for (let name of possibleNames) {
+                    const index = headers.findIndex(h => h.includes(name.toLowerCase()));
+                    if (index !== -1) return index;
+                }
+                return -1;
+            };
+
+            const barcoIndex = getColumnIndex(['barco']);
+            const lugarIndex = getColumnIndex(['lugar de entrega', 'lugar', 'entrega']);
+            const numeroIndex = getColumnIndex(['número de pedido', 'numero', 'pedido']);
+            const fechaIndex = getColumnIndex(['fecha de entrega', 'fecha']);
+            const estadoIndex = getColumnIndex(['estado']);
+
+            const pedidos = [];
+
+            // Procesar filas (empezando desde la fila 2, índice 1)
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.values || !row.values[barcoIndex]?.formattedValue) continue;
+
+                const barcoCell = row.values[barcoIndex];
+                const colorFondo = barcoCell.effectiveFormat?.backgroundColor;
+                const colorTexto = barcoCell.effectiveFormat?.textFormat?.foregroundColor;
+
+                pedidos.push({
+                    barco: row.values[barcoIndex]?.formattedValue || '',
+                    lugar: row.values[lugarIndex]?.formattedValue || '',
+                    numero: row.values[numeroIndex]?.formattedValue || '',
+                    fecha: row.values[fechaIndex]?.formattedValue || '',
+                    estado: row.values[estadoIndex]?.formattedValue || 'Pendiente',
+                    colorFondo: rgbToHex(colorFondo),
+                    colorBarco: rgbToHex(colorTexto)
+                });
+            }
+
+            return pedidos;
+        }
+
+        // Función para ordenar pedidos por fecha
+        function sortPedidos(pedidos, order) {
+            if (order === 'none') {
+                return [...pedidos];
+            }
+
+            const sorted = [...pedidos].sort((a, b) => {
+                const parseDate = (dateStr) => {
+                    if (!dateStr) return new Date(0);
+                    const parts = dateStr.split('/');
+                    if (parts.length !== 3) return new Date(0);
+                    return new Date(parts[2], parts[1] - 1, parts[0]);
+                };
+
+                const dateA = parseDate(a.fecha);
+                const dateB = parseDate(b.fecha);
+
+                if (order === 'asc') {
+                    return dateA - dateB;
+                } else {
+                    return dateB - dateA;
+                }
+            });
+
+            return sorted;
+        }
+
+        // Función para renderizar los pedidos
+        function renderDepartures(pedidos) {
+            const board = document.getElementById('departureBoard');
+            board.innerHTML = '';
+
+            if (pedidos.length === 0) {
+                board.innerHTML = '<div class="loading">No hay pedidos para mostrar</div>';
+                return;
+            }
+
+            const sortedPedidos = sortPedidos(pedidos, currentSortOrder);
+
+            sortedPedidos.forEach((pedido) => {
+                const statusClass = pedido.estado.toLowerCase().includes('parcial') ? '' : 'status-pendiente';
+                
+                const item = document.createElement('div');
+                item.className = 'departure-item';
+                
+                // Aplicar color de fondo si existe
+                if (pedido.colorFondo) {
+                    item.style.backgroundColor = pedido.colorFondo;
+                }
+                
+                // Crear estilo inline para el color del barco
+                const barcoStyle = pedido.colorBarco ? style="color: ${pedido.colorBarco};" : '';
+                
+                item.innerHTML = `
+                    <div class="departure-header">
+                        <div class="time">${pedido.fecha}</div>
+                        <div class="destination" ${barcoStyle} onclick="filterByBarco('${pedido.barco.replace(/'/g, "\\'")}')">${pedido.barco}</div>
+                        <div class="info-box">
+                            <div class="train-number">${pedido.numero}</div>
+                            <div class="status ${statusClass}">${pedido.estado}</div>
+                        </div>
+                    </div>
+                    <div class="stops-container">
+                        <div class="stops">
+                            <span class="stops-content">${pedido.lugar}</span>
+                        </div>
+                    </div>
+                `;
+                
+                board.appendChild(item);
+                
+                // Detectar si el texto necesita scroll
+                setTimeout(() => {
+                    const stopsContent = item.querySelector('.stops-content');
+                    const stopsContainer = item.querySelector('.stops-container');
+                    if (stopsContent && stopsContainer) {
+                        const contentWidth = stopsContent.scrollWidth;
+                        const containerWidth = stopsContainer.offsetWidth;
+                        
+                        if (contentWidth > containerWidth) {
+                            stopsContent.classList.add('scroll-animation');
+                        }
+                    }
+                }, 200);
+            });
+        }
+
+        // Inicializar
+        updateDate();
+        loadData();
+        updateSortIndicator();
+
+        // Recargar datos cada 30 minutos
+        setInterval(loadData, 1800000);
+    </script>
+</body>
+</html>
