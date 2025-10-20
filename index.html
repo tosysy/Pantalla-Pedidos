@@ -13,6 +13,9 @@
                 <span style="font-size: 32px;">🚢</span>
                 <span>Salidas</span>
             </div>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Buscar fecha de entrega, barco, comentario, número de pedido...">
+            </div>
             <div class="date" id="date">00/00/0000</div>
         </div>
         
@@ -282,9 +285,23 @@
             });
         }
 
+        // Función para buscar
+        function search() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredPedidos = allPedidos.filter(p => 
+                p.fecha.toLowerCase().includes(searchTerm) ||
+                p.barco.toLowerCase().includes(searchTerm) ||
+                p.lugar.toLowerCase().includes(searchTerm) ||
+                p.numero.toLowerCase().includes(searchTerm)
+            );
+            renderDepartures(filteredPedidos);
+        }
+
         // Inicializar
         updateDate();
         loadData();
+
+        document.getElementById('searchInput').addEventListener('keyup', search);
 
         document.getElementById('sortFechaAsc').addEventListener('click', () => {
             currentSortBy = 'fecha';
