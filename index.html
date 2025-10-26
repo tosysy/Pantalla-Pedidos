@@ -192,6 +192,18 @@
         // Función para ordenar pedidos
         function sortPedidos(pedidos, sortBy, order) {
             const sorted = [...pedidos].sort((a, b) => {
+                // Prioridad: pedidos sin 'fecha' van al final
+                const aHasFecha = a.fecha && a.fecha.trim() !== '';
+                const bHasFecha = b.fecha && b.fecha.trim() !== '';
+
+                if (aHasFecha && !bHasFecha) {
+                    return -1; // 'a' va antes
+                }
+                if (!aHasFecha && bHasFecha) {
+                    return 1; // 'b' va antes
+                }
+
+                // Si ambos tienen o no tienen 'fecha', se aplica el ordenamiento normal
                 let valA, valB;
 
                 if (sortBy === 'fecha') {
