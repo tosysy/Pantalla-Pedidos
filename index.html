@@ -163,6 +163,7 @@
             const numeroIndex = getColumnIndex(['número de pedido', 'numero', 'pedido']);
             const fechaIndex = getColumnIndex(['fecha de entrega', 'fecha']);
             const estadoIndex = getColumnIndex(['estado']);
+            const fechaSistemaIndex = getColumnIndex(['fecha sistema']);
 
             const pedidos = [];
 
@@ -181,6 +182,7 @@
                     numero: row.values[numeroIndex]?.formattedValue || '',
                     fecha: row.values[fechaIndex]?.formattedValue || '',
                     estado: row.values[estadoIndex]?.formattedValue || 'Pendiente',
+                    fechaSistema: fechaSistemaIndex !== -1 && row.values[fechaSistemaIndex] ? row.values[fechaSistemaIndex].formattedValue || '' : '',
                     colorFondo: rgbToHex(colorFondo),
                     colorBarco: rgbToHex(colorTexto)
                 });
@@ -235,6 +237,7 @@
 
 
         // Función para renderizar los pedidos
+// Función para renderizar los pedidos
         function renderDepartures(pedidos) {
             const board = document.getElementById('departureBoard');
             board.innerHTML = '';
@@ -265,11 +268,14 @@
                 // Crear estilo inline para el color del barco
                 const barcoStyle = pedido.colorBarco ? `style="color: ${pedido.colorBarco};"` : '';
                 
+                // --- MODIFICACIÓN AQUÍ ---
+                // Se movió <br>(${pedido.fechaSistema}) desde el div 'status'
+                // y se añadió al final del div 'train-number'.
                 item.innerHTML = `
                     <div class="departure-header">
                         <div class="time">${pedido.fecha}</div>
-                        <div class="destination" ${barcoStyle} onclick="filterByBarco('${pedido.barco.replace(/'/g, "'")}')">${pedido.barco}</div>
-                        <div class="train-number">${pedido.numero}</div>
+                        <div class="destination" ${barcoStyle} onclick="filterByBarco('''${pedido.barco.replace(/'/g, "\'")}''')">${pedido.barco}</div>
+                        <div class="train-number">${pedido.numero}<br>(${pedido.fechaSistema})</div>
                         <div class="status ${statusClass}">${pedido.estado}</div>
                     </div>
                     <div class="stops-container">
@@ -278,6 +284,7 @@
                         </div>
                     </div>
                 `;
+                // --- FIN DE LA MODIFICACIÓN ---
                 
                 board.appendChild(item);
                 
@@ -295,18 +302,6 @@
                     }
                 }, 200);
             });
-        }
-
-        // Función para buscar
-        function search() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const filteredPedidos = allPedidos.filter(p => 
-                p.fecha.toLowerCase().includes(searchTerm) ||
-                p.barco.toLowerCase().includes(searchTerm) ||
-                p.lugar.toLowerCase().includes(searchTerm) ||
-                p.numero.toLowerCase().includes(searchTerm)
-            );
-            renderDepartures(filteredPedidos);
         }
 
         // Inicializar
