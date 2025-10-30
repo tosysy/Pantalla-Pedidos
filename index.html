@@ -59,14 +59,18 @@
 
         // Variables globales
         let allPedidos = [];
+        let currentFilteredPedidos = [];
         let currentSortBy = 'fecha';
         let currentSortOrder = 'asc';
 
 
         // Función para filtrar por barco
         function filterByBarco(barco) {
-            const filteredPedidos = allPedidos.filter(p => p.barco === barco);
-            renderDepartures(filteredPedidos);
+            currentFilteredPedidos = allPedidos.filter(p => p.barco === barco);
+            renderDepartures(currentFilteredPedidos);
+
+            // Limpiar el input de búsqueda
+            document.getElementById('searchInput').value = '';
 
             let showAllButton = document.getElementById('showAllButton');
             if (!showAllButton) {
@@ -74,13 +78,14 @@
                 showAllButton.id = 'showAllButton';
                 showAllButton.className = 'show-all-btn';
                 document.querySelector('.header .logo').appendChild(showAllButton);
-                
+
                 showAllButton.onclick = () => {
+                    currentFilteredPedidos = allPedidos;
                     renderDepartures(allPedidos);
                     showAllButton.remove();
                 };
             }
-            
+
             showAllButton.textContent = `Mostrando solo "${barco}". Click para ver todos.`;
         }
 
@@ -95,6 +100,28 @@
             return `rgb(${r}, ${g}, ${b})`;
         }
 
+
+        // Función para buscar y filtrar pedidos
+        function search() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            if (!searchTerm) {
+                currentFilteredPedidos = allPedidos;
+            } else {
+                currentFilteredPedidos = allPedidos.filter(pedido => {
+                    return (
+                        pedido.fecha.toLowerCase().includes(searchTerm) ||
+                        pedido.barco.toLowerCase().includes(searchTerm) ||
+                        pedido.lugar.toLowerCase().includes(searchTerm) ||
+                        pedido.numero.toLowerCase().includes(searchTerm) ||
+                        pedido.estado.toLowerCase().includes(searchTerm) ||
+                        pedido.fechaSistema.toLowerCase().includes(searchTerm)
+                    );
+                });
+            }
+
+            renderDepartures(currentFilteredPedidos);
+        }
 
         // Función para actualizar la fecha
         function updateDate() {
@@ -126,6 +153,7 @@
                 }
                 
                 allPedidos = pedidos;
+                currentFilteredPedidos = pedidos;
                 renderDepartures(allPedidos);
             } catch (error) {
                 console.error('Error al cargar datos:', error);
@@ -274,7 +302,7 @@
                 item.innerHTML = `
                     <div class="departure-header">
                         <div class="time">${pedido.fecha}</div>
-                        <div class="destination" ${barcoStyle} onclick="filterByBarco('''${pedido.barco.replace(/'/g, "\'")}''')">${pedido.barco}</div>
+                        <div class="destination" ${barcoStyle} onclick="filterByBarco('${pedido.barco.replace(/'/g, "\\'")}')"><span style="cursor: pointer;">${pedido.barco}</span></div>
                         <div class="train-number">${pedido.numero}<br>(${pedido.fechaSistema})</div>
                         <div class="status ${statusClass}">${pedido.estado}</div>
                     </div>
@@ -313,32 +341,32 @@
         document.getElementById('sortFechaAsc').addEventListener('click', () => {
             currentSortBy = 'fecha';
             currentSortOrder = 'asc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
         document.getElementById('sortFechaDesc').addEventListener('click', () => {
             currentSortBy = 'fecha';
             currentSortOrder = 'desc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
         document.getElementById('sortBarcoAsc').addEventListener('click', () => {
             currentSortBy = 'barco';
             currentSortOrder = 'asc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
         document.getElementById('sortBarcoDesc').addEventListener('click', () => {
             currentSortBy = 'barco';
             currentSortOrder = 'desc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
         document.getElementById('sortEstadoAsc').addEventListener('click', () => {
             currentSortBy = 'estado';
             currentSortOrder = 'asc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
         document.getElementById('sortEstadoDesc').addEventListener('click', () => {
             currentSortBy = 'estado';
             currentSortOrder = 'desc';
-            renderDepartures(allPedidos);
+            renderDepartures(currentFilteredPedidos);
         });
 
         // Recargar datos cada 30 minutos
